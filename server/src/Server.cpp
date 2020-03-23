@@ -44,13 +44,6 @@ void Connection::read()
         });
 }
 
-void Connection::send(std::string msg)
-{
-    // We cannot send from multiple threads, so we need a strand
-    ioservice_.post(writeStrand_.wrap(
-        [me = shared_from_this(), msg = std::move(msg)]() { me->queueMessage(std::move(msg)); }));
-}
-
 void Connection::readBuf(const error_code& error, size_t size)
 {
     if (error)
@@ -70,6 +63,13 @@ void Connection::readBuf(const error_code& error, size_t size)
     }
 
     read();
+}
+
+void Connection::send(std::string msg)
+{
+    // We cannot send from multiple threads, so we need a strand
+    ioservice_.post(writeStrand_.wrap(
+        [me = shared_from_this(), msg = std::move(msg)]() { me->queueMessage(std::move(msg)); }));
 }
 
 void Connection::queueMessage(std::string msg)
@@ -102,12 +102,19 @@ void Connection::sendDone(const error_code& error)
     }
 }
 
+Server::Server(Config config)
+    : config_(std::move(config))
+    , threads_(config.numThreads)
+    , acceptor_(ioservice_)
+{
+}
+
 void Server::accept()
 {
     const auto connection = std::make_shared<Connection>(ioservice_);
 
-    acceptor_.async_accept(
-        connection->getSocket(), [=](auto error) { handleConnection(connection, error); });
+    acceptor_.async_accept(connection->getSocket(),
+        [=](const error_code& error) { handleConnection(connection, error); });
 }
 
 void Server::handleConnection(std::shared_ptr<Connection> connection, const error_code& error)
