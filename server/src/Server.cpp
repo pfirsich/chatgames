@@ -21,6 +21,13 @@ std::string readString(asio::streambuf& sbuf, size_t n)
     return std::string { begin, begin + n };
 }
 
+Connection::Connection(asio::io_service& ioservice)
+    : ioservice_(ioservice)
+    , socket_(ioservice)
+    , writeStrand_(ioservice)
+{
+}
+
 tcp::socket& Connection::getSocket()
 {
     return socket_;

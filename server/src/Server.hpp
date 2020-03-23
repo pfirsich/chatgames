@@ -18,12 +18,7 @@ using boost::system::error_code;
 
 class Connection : public std::enable_shared_from_this<Connection> {
 public:
-    Connection(asio::io_service& ioservice)
-        : ioservice_(ioservice)
-        , socket_(ioservice)
-        , writeStrand_(ioservice)
-    {
-    }
+    Connection(asio::io_service& ioservice);
 
     tcp::socket& getSocket();
 
@@ -46,12 +41,7 @@ private:
 
 class Server {
 public:
-    Server(Config config)
-        : config_(std::move(config))
-        , threads_(config.numThreads)
-        , acceptor_(ioservice_)
-    {
-    }
+    Server(Config config);
 
     void run();
 
