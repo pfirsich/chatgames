@@ -16,6 +16,9 @@ include_directories(server PUBLIC deps/tomlplusplus/include)
 set(SERVER_SRC
   Config.cpp
   Server.cpp
+  LobbySession.cpp
+  serialization.cpp
+  words.cpp
   server.main.cpp
 )
 list(TRANSFORM SERVER_SRC PREPEND src/)
