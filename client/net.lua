@@ -12,8 +12,8 @@ local msgTypes = {
     unlockLobby = 6, -- send
     sendMessage = 7, -- send
     relayMessage = 8, -- recv
-    requestPlayerList = 9, -- send
-    returnPlayerList = 10, -- recv
+    requestLobbyUpdate = 9, -- send
+    updateLobby = 10, -- recv
     heartbeat = 11, -- send
 }
 
@@ -22,7 +22,7 @@ local net = {}
 net.events = {
     connected = 1,
     lobbyJoined = 2,
-    playerListUpdated = 3,
+    lobbyUpdated = 3,
     message = 4,
 }
 
@@ -116,9 +116,9 @@ messageHandlers[msgTypes.relayMessage] = function(msg)
     }})
 end
 
-messageHandlers[msgTypes.returnPlayerList] = function(msg)
+messageHandlers[msgTypes.updateLobby] = function(msg)
     reader:reset(msg)
-    assert(reader:u8() == msgTypes.returnPlayerList)
+    assert(reader:u8() == msgTypes.updateLobby)
     local numPlayers = reader:u8()
     net.players = {}
     for i = 1, numPlayers do
@@ -131,7 +131,7 @@ messageHandlers[msgTypes.returnPlayerList] = function(msg)
         })
         table.sort(net.players, function(a, b) return a.id < b.id end)
     end
-    events:push({type = net.events.playerListUpdated, data = net.players})
+    events:push({type = net.events.lobbyUpdated, data = net.players})
 end
 
 local function readSocket(sock)

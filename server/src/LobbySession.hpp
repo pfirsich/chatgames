@@ -87,8 +87,8 @@ private:
         unlockLobby = 6, // c -> s
         sendMessage = 7, // c -> s
         relayMessage = 8, // c <- s
-        requestPlayerList = 9, // c -> s
-        returnPlayerList = 10, // c <- s
+        requestLobbyUpdate = 9, // c -> s
+        updateLobby = 10, // c <- s
         heartbeat = 11, // c -> s
         lastMessageType,
     };
@@ -105,7 +105,7 @@ private:
     void encodeLobbyJoined(BufferWriter& wbuf, const std::string& lobbyId, uint8_t playerId);
 
     // Requires at least shared lock on lobby_
-    void encodeReturnPlayerList(BufferWriter& wbuf);
+    void encodeLobbyUpdate(BufferWriter& wbuf);
 
     void processCreateLobby(BufferReader& rbuf);
     void processJoinLobby(BufferReader& rbuf);
@@ -114,7 +114,7 @@ private:
     void processLockLobby(BufferReader& /*rbuf*/);
     void processUnlockLobby(BufferReader& /*rbuf*/);
     void processSendMessage(BufferReader& rbuf);
-    void processRequestPlayerList(BufferReader& /*rbuf*/);
+    void processRequestLobbyUpdate(BufferReader& /*rbuf*/);
 
     void processMessage(const std::string& msg);
 

@@ -173,9 +173,9 @@ void LobbySession::encodeLobbyJoined(
 }
 
 // Requires at least shared lock on lobby_
-void LobbySession::encodeReturnPlayerList(BufferWriter& wbuf)
+void LobbySession::encodeLobbyUpdate(BufferWriter& wbuf)
 {
-    wbuf.integer<uint8_t>(static_cast<uint8_t>(MessageType::returnPlayerList));
+    wbuf.integer<uint8_t>(static_cast<uint8_t>(MessageType::updateLobby));
     wbuf.integer<uint8_t>(lobby_->players.size());
     for (const auto& player : lobby_->players) {
         wbuf.integer<uint8_t>(player.id);
@@ -186,14 +186,16 @@ void LobbySession::encodeReturnPlayerList(BufferWriter& wbuf)
 void LobbySession::processCreateLobby(BufferReader& rbuf)
 {
     const auto playerName = rbuf.string();
-    BufferWriter wbuf;
+    BufferWriter lobbyJoinedBuf, lobbyUpdateBuf;
     lobby_ = context_.createLobby();
     {
         std::unique_lock lock(lobby_->mutex);
         playerId = lobby_->addPlayer(playerName, getWeakPtr());
-        encodeLobbyJoined(wbuf, lobby_->name, *playerId);
+        encodeLobbyJoined(lobbyJoinedBuf, lobby_->name, *playerId);
+        encodeLobbyUpdate(lobbyUpdateBuf);
+        sendResponse(lobbyJoinedBuf.toString());
+        sendToAll(lobbyUpdateBuf.toString());
     }
-    sendResponse(wbuf.toString());
 
     spdlog::debug("Create lobby {} with player {} (id: {})", lobby_->name, playerName, *playerId);
 }
@@ -204,14 +206,14 @@ void LobbySession::processJoinLobby(BufferReader& rbuf)
     const auto lobbyId = rbuf.string();
     lobby_ = context_.getLobby(lobbyId);
     if (lobby_) {
-        BufferWriter lobbyJoinedBuf, playerListBuf;
+        BufferWriter lobbyJoinedBuf, lobbyUpdateBuf;
         std::unique_lock lock(lobby_->mutex);
         if (lobby_->canJoin()) {
             playerId = lobby_->addPlayer(playerName, getWeakPtr());
             encodeLobbyJoined(lobbyJoinedBuf, lobby_->name, *playerId);
-            encodeReturnPlayerList(playerListBuf);
+            encodeLobbyUpdate(lobbyUpdateBuf);
             sendResponse(lobbyJoinedBuf.toString());
-            sendToAll(playerListBuf.toString());
+            sendToAll(lobbyUpdateBuf.toString());
             spdlog::debug(
                 "Joined lobby {} with player {} (id: {})", lobby_->name, playerName, *playerId);
         } else {
@@ -231,7 +233,7 @@ void LobbySession::processLeaveLobby(BufferReader& /*rbuf*/)
             playerId = std::nullopt;
 
             BufferWriter wbuf;
-            encodeReturnPlayerList(wbuf);
+            encodeLobbyUpdate(wbuf);
             sendToAll(wbuf.toString());
         }
         lobby_.reset();
@@ -281,13 +283,13 @@ void LobbySession::processSendMessage(BufferReader& rbuf)
     }
 }
 
-void LobbySession::processRequestPlayerList(BufferReader& /*rbuf*/)
+void LobbySession::processRequestLobbyUpdate(BufferReader& /*rbuf*/)
 {
     if (lobby_) {
         BufferWriter wbuf;
         {
             std::shared_lock lock(lobby_->mutex);
-            encodeReturnPlayerList(wbuf);
+            encodeLobbyUpdate(wbuf);
         }
         sendResponse(wbuf.toString());
     }
@@ -322,8 +324,8 @@ void LobbySession::processMessage(const std::string& msg)
     case MessageType::sendMessage:
         processSendMessage(rbuf);
         break;
-    case MessageType::requestPlayerList:
-        processRequestPlayerList(rbuf);
+    case MessageType::requestLobbyUpdate:
+        processRequestLobbyUpdate(rbuf);
         break;
     case MessageType::heartbeat:
         // this message is supposed to be ignored
@@ -353,10 +355,10 @@ std::ostream& operator<<(std::ostream& os, LobbySession::MessageType type)
         return os << "sendMessage";
     case LobbySession::MessageType::relayMessage:
         return os << "relayMessage";
-    case LobbySession::MessageType::requestPlayerList:
-        return os << "requestPlayerList";
-    case LobbySession::MessageType::returnPlayerList:
-        return os << "returnPlayerList";
+    case LobbySession::MessageType::requestLobbyUpdate:
+        return os << "requestLobbyUpdate";
+    case LobbySession::MessageType::updateLobby:
+        return os << "updateLobby";
     case LobbySession::MessageType::heartbeat:
         return os << "heartbeat";
     default:
