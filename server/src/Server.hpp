@@ -72,14 +72,14 @@ public:
 
         for (auto& thread : threads_)
             thread = std::thread { [&]() { ioservice_.run(); } };
-        spdlog::info("Started {} worker threads", threads_.size());
+        spdlog::info("Started {} IO worker threads", threads_.size());
 
         spdlog::info("Running context");
         context_.run();
 
         for (auto& thread : threads_)
             thread.join();
-        spdlog::warn("Worker threads joined");
+        spdlog::warn("IO worker threads joined");
     }
 
 private:

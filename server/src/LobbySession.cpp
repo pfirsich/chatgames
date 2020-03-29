@@ -1,5 +1,7 @@
 #include "LobbySession.hpp"
 
+#include <spdlog/fmt/ostr.h>
+
 #include "util.hpp"
 #include "words.hpp"
 
@@ -64,11 +66,22 @@ bool Lobby::isPlayerMaster(Player::Id id) const
 
 LobbyContext::LobbyContext(Config config)
     : config_(std::move(config))
+    , threads_(config.numThreads)
 {
 }
 
 void LobbyContext::run()
 {
+    // Make sure .run doesn't terminate even if there is no work to do
+    asio::io_service::work work(ioservice_);
+
+    for (auto& thread : threads_)
+        thread = std::thread { [&]() { ioservice_.run(); } };
+    spdlog::info("Started {} lobby worker threads", threads_.size());
+
+    for (auto& thread : threads_)
+        thread.join();
+    spdlog::warn("Lobby worker threads joined");
 }
 
 std::shared_ptr<Lobby> LobbyContext::createLobby()
@@ -95,8 +108,14 @@ std::shared_ptr<Lobby> LobbyContext::getLobby(std::string_view name) const
         return nullptr;
 }
 
+asio::io_service& LobbyContext::getIoService()
+{
+    return ioservice_;
+}
+
 LobbySession::LobbySession(asio::io_service& ioservice, LobbyContext& context)
     : ConnectionBase(ioservice)
+    , strand_(context.getIoService())
     , context_(context)
 {
 }
@@ -109,7 +128,16 @@ void LobbySession::processReadBuf(asio::streambuf& readBuf)
 {
     const auto msg = readMessage(readBuf);
     if (msg) {
-        processMessage(*msg);
+        spdlog::debug("Received message: {}", hexDump(*msg));
+        // We use a strand for all message processing of a single connection, to make sure
+        // that the messages are handled in the order they are received.
+        // Without the strand it might happen that we receive message A, then B
+        // and the processing of A might take longer than B in another thread,
+        // so B is responded to before A.
+        // We also save a mutex for _lobby and playerId.
+        context_.getIoService().post(strand_.wrap([me = getSharedPtr(), msg = std::move(*msg)] {
+            dynamic_cast<LobbySession*>(me.get())->processMessage(msg);
+        }));
     }
 }
 
@@ -274,6 +302,7 @@ void LobbySession::processMessage(const std::string& msg)
         return;
     }
     const auto type = static_cast<MessageType>(typeVal);
+    spdlog::debug("processMessage {}", type);
     switch (type) {
     case MessageType::createLobby:
         processCreateLobby(rbuf);
@@ -302,5 +331,35 @@ void LobbySession::processMessage(const std::string& msg)
     default:
         spdlog::info("Received message of unexpected type: {}", typeVal);
         break;
+    }
+}
+
+std::ostream& operator<<(std::ostream& os, LobbySession::MessageType type)
+{
+    switch (type) {
+    case LobbySession::MessageType::createLobby:
+        return os << "createLobby";
+    case LobbySession::MessageType::joinLobby:
+        return os << "joinLobby";
+    case LobbySession::MessageType::lobbyJoined:
+        return os << "lobbyJoined";
+    case LobbySession::MessageType::leaveLobby:
+        return os << "leaveLobby";
+    case LobbySession::MessageType::lockLobby:
+        return os << "lockLobby";
+    case LobbySession::MessageType::unlockLobby:
+        return os << "unlockLobby";
+    case LobbySession::MessageType::sendMessage:
+        return os << "sendMessage";
+    case LobbySession::MessageType::relayMessage:
+        return os << "relayMessage";
+    case LobbySession::MessageType::requestPlayerList:
+        return os << "requestPlayerList";
+    case LobbySession::MessageType::returnPlayerList:
+        return os << "returnPlayerList";
+    case LobbySession::MessageType::heartbeat:
+        return os << "heartbeat";
+    default:
+        return os << "Unknown";
     }
 }

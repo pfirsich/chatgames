@@ -60,8 +60,12 @@ public:
     std::shared_ptr<Lobby> createLobby();
     std::shared_ptr<Lobby> getLobby(std::string_view name) const;
 
+    asio::io_service& getIoService();
+
 private:
     Config config_;
+    std::vector<std::thread> threads_;
+    asio::io_service ioservice_;
     std::unordered_map<std::string, std::weak_ptr<Lobby>> lobbies_;
     mutable std::shared_mutex mutex_;
 };
@@ -89,6 +93,8 @@ private:
         lastMessageType,
     };
 
+    friend std::ostream& operator<<(std::ostream& os, MessageType type);
+
     void sendMessage(std::shared_ptr<ConnectionBase> connection, std::string_view data);
 
     void sendResponse(std::string_view data);
@@ -114,5 +120,6 @@ private:
 
     std::optional<size_t> playerId;
     std::shared_ptr<Lobby> lobby_;
+    asio::io_service::strand strand_;
     LobbyContext& context_;
 };

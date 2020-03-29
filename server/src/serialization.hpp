@@ -31,7 +31,7 @@ T hton(T val)
 {
     static_assert(
         std::is_same_v<T, uint8_t> || std::is_same_v<T, uint16_t> || std::is_same_v<T, uint32_t>,
-        "Unknown type for ntoh");
+        "Unknown type for hton");
     if constexpr (std::is_same_v<T, uint8_t>) {
         return val;
     } else if constexpr (std::is_same_v<T, uint16_t>) {
