@@ -38,11 +38,10 @@ void ConnectionBase::send(std::string msg)
 {
     spdlog::debug("ConnectionBase::send ({}): {}", threadIdStr(), hexDump(msg));
     // We cannot send from multiple threads, so we need a strand
-    ioContext_.post(
-        asio::bind_executor(writeStrand_, [me = this->shared_from_this(), msg = std::move(msg)]() {
-            spdlog::debug("in lambda send ({}): {}", threadIdStr(), hexDump(msg));
-            me->queueMessage(std::move(msg));
-        }));
+    asio::post(writeStrand_, [me = this->shared_from_this(), msg = std::move(msg)]() {
+        spdlog::debug("in lambda ({}): {}", threadIdStr(), hexDump(msg));
+        me->queueMessage(std::move(msg));
+    });
 }
 
 void ConnectionBase::readBuf(const error_code& error, size_t size)

@@ -135,10 +135,9 @@ void LobbySession::processReadBuf(asio::streambuf& readBuf)
         // and the processing of A might take longer than B in another thread,
         // so B is responded to before A.
         // We also save a mutex for _lobby and playerId.
-        ioContext_.post(
-            asio::bind_executor(strand_, [me = getSharedPtr(), msg = std::move(*msg)]() {
-                dynamic_cast<LobbySession*>(me.get())->processMessage(msg);
-            }));
+        asio::post(strand_, [me = getSharedPtr(), msg = std::move(*msg)]() {
+            dynamic_cast<LobbySession*>(me.get())->processMessage(msg);
+        });
     }
 }
 
