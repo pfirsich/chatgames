@@ -19,6 +19,7 @@ set(SERVER_SRC
   LobbySession.cpp
   serialization.cpp
   words.cpp
+  util.cpp
   server.main.cpp
 )
 list(TRANSFORM SERVER_SRC PREPEND src/)

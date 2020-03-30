@@ -60,19 +60,19 @@ public:
     std::shared_ptr<Lobby> createLobby();
     std::shared_ptr<Lobby> getLobby(std::string_view name) const;
 
-    asio::io_service& getIoService();
+    asio::io_context& getIoContext();
 
 private:
     Config config_;
     std::vector<std::thread> threads_;
-    asio::io_service ioservice_;
+    asio::io_context ioContext_;
     std::unordered_map<std::string, std::weak_ptr<Lobby>> lobbies_;
     mutable std::shared_mutex mutex_;
 };
 
 class LobbySession : public ConnectionBase {
 public:
-    LobbySession(asio::io_service& ioservice, LobbyContext& context);
+    LobbySession(asio::io_context& ioContext, LobbyContext& context);
     ~LobbySession();
 
     void processReadBuf(asio::streambuf& readBuf) override;
@@ -120,6 +120,6 @@ private:
 
     std::optional<size_t> playerId;
     std::shared_ptr<Lobby> lobby_;
-    asio::io_service::strand strand_;
+    boost::asio::strand<boost::asio::io_context::executor_type> strand_;
     LobbyContext& context_;
 };

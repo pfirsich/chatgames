@@ -73,10 +73,10 @@ LobbyContext::LobbyContext(Config config)
 void LobbyContext::run()
 {
     // Make sure .run doesn't terminate even if there is no work to do
-    asio::io_service::work work(ioservice_);
+    auto work { asio::make_work_guard(ioContext_) };
 
     for (auto& thread : threads_)
-        thread = std::thread { [&]() { ioservice_.run(); } };
+        thread = std::thread { [&]() { ioContext_.run(); } };
     spdlog::info("Started {} lobby worker threads", threads_.size());
 
     for (auto& thread : threads_)
@@ -108,14 +108,14 @@ std::shared_ptr<Lobby> LobbyContext::getLobby(std::string_view name) const
         return nullptr;
 }
 
-asio::io_service& LobbyContext::getIoService()
+asio::io_context& LobbyContext::getIoContext()
 {
-    return ioservice_;
+    return ioContext_;
 }
 
-LobbySession::LobbySession(asio::io_service& ioservice, LobbyContext& context)
-    : ConnectionBase(ioservice)
-    , strand_(context.getIoService())
+LobbySession::LobbySession(asio::io_context& ioContext, LobbyContext& context)
+    : ConnectionBase(ioContext)
+    , strand_(context.getIoContext().get_executor())
     , context_(context)
 {
 }
@@ -135,9 +135,10 @@ void LobbySession::processReadBuf(asio::streambuf& readBuf)
         // and the processing of A might take longer than B in another thread,
         // so B is responded to before A.
         // We also save a mutex for _lobby and playerId.
-        context_.getIoService().post(strand_.wrap([me = getSharedPtr(), msg = std::move(*msg)] {
-            dynamic_cast<LobbySession*>(me.get())->processMessage(msg);
-        }));
+        ioContext_.post(
+            asio::bind_executor(strand_, [me = getSharedPtr(), msg = std::move(*msg)]() {
+                dynamic_cast<LobbySession*>(me.get())->processMessage(msg);
+            }));
     }
 }
 

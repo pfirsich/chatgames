@@ -19,7 +19,7 @@ using boost::system::error_code;
 
 class ConnectionBase : public std::enable_shared_from_this<ConnectionBase> {
 public:
-    ConnectionBase(asio::io_service& ioservice);
+    ConnectionBase(asio::io_context& ioContext_);
 
     virtual ~ConnectionBase() = default;
 
@@ -41,9 +41,9 @@ private:
 protected:
     virtual void processReadBuf(asio::streambuf&) = 0;
 
-    asio::io_service& ioservice_;
+    asio::io_context& ioContext_;
+    boost::asio::strand<boost::asio::io_context::executor_type> writeStrand_;
     tcp::socket socket_;
-    asio::io_service::strand writeStrand_;
     asio::streambuf readBuf_;
     std::deque<std::string> sendQueue_;
 };
@@ -54,7 +54,7 @@ public:
     Server(Config config)
         : config_(std::move(config))
         , threads_(config.numThreads)
-        , acceptor_(ioservice_)
+        , acceptor_(ioContext_)
         , context_(config_)
     {
     }
@@ -71,7 +71,7 @@ public:
         accept();
 
         for (auto& thread : threads_)
-            thread = std::thread { [&]() { ioservice_.run(); } };
+            thread = std::thread { [&]() { ioContext_.run(); } };
         spdlog::info("Started {} IO worker threads", threads_.size());
 
         spdlog::info("Running context");
@@ -85,7 +85,7 @@ public:
 private:
     void accept()
     {
-        const auto connection = std::make_shared<Connection>(ioservice_, context_);
+        const auto connection = std::make_shared<Connection>(ioContext_, context_);
 
         acceptor_.async_accept(connection->getSocket(),
             [=](const error_code& error) { handleConnection(connection, error); });
@@ -104,7 +104,7 @@ private:
 
     Config config_;
     std::vector<std::thread> threads_;
-    asio::io_service ioservice_;
+    asio::io_context ioContext_;
     tcp::acceptor acceptor_;
     Context context_;
 };
