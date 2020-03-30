@@ -15,7 +15,6 @@ function scene.tick()
             print("Joined lobby:", event.data.lobbyId, event.data.playerId)
             scenes.enter(scenes.lobby, event.data)
         else
-            print(event.type)
             error("Unexpected event: " .. net.events:getName(event.type))
         end
     end

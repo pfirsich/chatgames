@@ -13,7 +13,21 @@ gui.defaultStyle = {
     textAlign = "center",
 }
 
-local Button = class("Button")
+local Widget = class("Widget")
+gui.Widget = Widget
+
+function Widget:initialize()
+    self.hidden = false
+end
+
+function Widget:setHidden(hidden)
+    self.hidden = hidden
+end
+
+function Widget:update()
+end
+
+local Button = class("Button", Widget)
 gui.Button = Button
 
 Button.defaultWidth = 200
@@ -32,6 +46,11 @@ function Button:initialize(text, width, height, x, y, params)
     self.triggered = false
     self.callback = params.callback
     self.style = params.style
+end
+
+function Button:setHidden(hidden)
+    self.triggered = false
+    Widget.setHidden(self, hidden)
 end
 
 function Button:update(dt, mouseState)
@@ -80,16 +99,13 @@ function Button:draw(style)
         self.w - style.textPadding * 2, style.textAlign or "center")
 end
 
-local Label = class("Label")
+local Label = class("Label", Widget)
 gui.Label = Label
 
 function Label:initialize(text, x, y)
     self.text = text
     self.x = x or 0
     self.y = y or 0
-end
-
-function Label:update()
 end
 
 function Label:draw(style)
@@ -111,7 +127,9 @@ function gui.update(widgets, dt, mx, my, mouseDown)
     }
 
     for i, widget in ipairs(widgets) do
-        widget:update(dt, mouseState)
+        if not widget.hidden then
+            widget:update(dt, mouseState)
+        end
     end
 
     widgets._lastMouseDown = mouseDown
@@ -120,7 +138,9 @@ end
 function gui.draw(widgets, style)
     style = style or gui.defaultStyle
     for i, widget in ipairs(widgets) do
-        widget:draw(style)
+        if not widget.hidden then
+            widget:draw(style)
+        end
     end
 end
 

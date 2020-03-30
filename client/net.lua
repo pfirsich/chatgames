@@ -2,8 +2,11 @@ local socket = require("socket")
 local BlobWriter = require("libs.BlobWriter")
 local BlobReader = require("libs.BlobReader")
 local Queue = require("queue")
+local msgpack = require("libs.msgpack")
+msgpack.set_string("string")
+msgpack.set_number("float")
 
-local msgTypes = {
+local msgTypes = ülp.constTable {
     createLobby = 0, -- send
     joinLobby = 2, -- send
     lobbyJoined = 3, -- recv
@@ -19,7 +22,7 @@ local msgTypes = {
 
 local net = {}
 
-net.events = {
+net.events = ülp.constTable {
     connected = 1,
     lobbyJoined = 2,
     lobbyUpdated = 3,
@@ -85,7 +88,7 @@ function net.joinLobby(lobbyId)
 end
 
 function net.sendMessage(msg)
-    sendMessage(msgTypes.sendMessage, msg)
+    sendMessage(msgTypes.sendMessage, msgpack.pack(msg))
 end
 
 local messageHandlers = {}
@@ -112,7 +115,7 @@ messageHandlers[msgTypes.relayMessage] = function(msg)
     local msg = tostring(reader:raw(msgLen))
     events:push({type = net.events.message, data = {
         playerId = _playerId,
-        message = msg,
+        message = msgpack.unpack(msg),
     }})
 end
 
@@ -134,7 +137,7 @@ messageHandlers[msgTypes.updateLobby] = function(msg)
     events:push({type = net.events.lobbyUpdated, data = net.players})
 end
 
-local function readSocket(sock)
+local function readSocket()
     local msg, err, part = tcp:receive("*all")
     if msg == nil and err == "timeout" then
         return part
@@ -172,7 +175,7 @@ local function concatUntil(recvQueue, sizeToReach)
 end
 
 local function receive()
-    local data = readSocket(sock)
+    local data = readSocket()
     local dataLen = data:len()
     if data and dataLen > 0 then
         print("Received:", ülp.hexDump(data), data)
@@ -211,6 +214,7 @@ local function receive()
         local msgType = msg:byte()
         local msgHandler = messageHandlers[msgType]
         if msgHandler then
+            print("receive", msgTypes:getName(msgType))
             msgHandler(msg)
         else
             print("Unexpected/unknown message type:", msgType)
@@ -247,6 +251,11 @@ function net.update()
     else
         return events:pop()
     end
+end
+
+function net.isMaster(playerId)
+    playerId = playerId or net.playerId
+    return net.players[1].id == playerId
 end
 
 return net

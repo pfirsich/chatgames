@@ -1,4 +1,5 @@
 require("globals")
+require("libs.strict")
 
 local net = require("net")
 local scenes = require("scenes")
